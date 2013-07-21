@@ -13,6 +13,8 @@ var moveBase, moveShoulder, moveElbow, moveClaw;
 var frames = [];
 var normalize = 3;
 var minimumClawDistance = 10;
+var l1 = 40*normalize;
+var l2 = 40*normalize;
 
 /*
  * Need to set up 4 servos: shoulder, elbow, claw, and base
@@ -31,16 +33,12 @@ controller.on('frame', function(frame) {
     moveBase = 180-calculateBaseAngle(handPosition[0]/2);
     moveShoulder = toDegrees(angles.theta1);
     moveElbow = 45+toDegrees(angles.theta2);
-    //moveShoulder = Math.abs(handPosition[1]/3);
-    //moveElbow = Math.abs(handPosition[2]/3);
   }
   if(frame.pointables.length > 1) {
     f1 = frame.pointables[0];
     f2 = frame.pointables[1];
     fingerDistance = distance(f1.tipPosition[0],f1.tipPosition[1],f1.tipPosition[2],f2.tipPosition[0],f2.tipPosition[1],f2.tipPosition[2]);
     moveClaw = (fingerDistance/1.5) - minimumClawDistance;
-    //frame.pointables[0].tipPosition[0] - frame.pointables[1].tipPosition[0];
-    //console.log("fingerDistance: " + fingerDistance);
   }
   frames.push(frame);
 });
@@ -76,10 +74,6 @@ board.on('ready', function() {
       servoBase.move(moveBase);
       servoShoulder.move(moveShoulder);
       servoElbow.move(moveElbow);
-      
-      //console.log("Base angle: " + moveBase);
-      //console.log("Shoulder angle: " + moveShoulder + "\tElbow angle: " + moveElbow);
-      //console.log("Elbow moved to " + moveElbow);  
     }
     if(moveClaw >= 0 && moveClaw <= 100) {
       servoClaw.move(moveClaw);
@@ -87,22 +81,6 @@ board.on('ready', function() {
     console.log("Base: " + Math.floor(moveBase) + "\tShoulder: " + Math.floor(moveShoulder) + "\tElbow: " + Math.floor(moveElbow) + "\tClaw: " + Math.floor(moveClaw));
   });
 });
-
-// This function has been deprecated.
-function calculateInverseKinematics_DEP(x,y,z) {
-  //z = Math.abs(z);
-  var length = 100;
-  var c2 = (square(z)+square(y)-square(length)-square(length))/(2*length*length);
-  var s2 = Math.sqrt(1-square(c2));
-  console.log("\t%c" + "y: " + y + " | z: " + z + " | c2: " + c2);
-  var shoulderAngle = Math.acos(c2); // psi
-  var elbowAngle = Math.asin((y*(length+length*c2)-z*length*s2)/(square(z)+square(y))); //theta
-  //console.log("PSI: " + shoulderAngle*57.295 + "\tTHETA: " + elbowAngle*57.295);
-  return {
-    shoulderAngle: shoulderAngle,
-    elbowAngle: elbowAngle
-  }
-}
 
 function calculateBaseAngle(x) {
   var n = 100*normalize;
@@ -113,12 +91,8 @@ function calculateBaseAngle(x) {
 
 function calculateInverseKinematics(x,y,z) {
   z = -z;
-  //var l = 40*normalize;
-  var l1 = 40*normalize;
-  var l2 = 40*normalize;
   var t1 = Math.acos((square(z)+square(y)-square(l1)-square(l2))/(2*l1*l2));
   var t2 = Math.asin(((l1+l2*Math.cos(t1))*y-l2*Math.sin(t1)*z)/(square(l1)+square(l2)+2*l1*l2*Math.cos(t1)));
-  //console.log("THETA1: " + t1*57.296 + "\tTHETA2: " + t2*57.296);
   return {
     theta1: t1,
     theta2: t2
