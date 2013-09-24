@@ -3,21 +3,34 @@
  * Written by Yu Jiang Tham, 2013
  */
 
-// Variables
+/*
+ * Variables
+ */
 var Leap = require('leapjs').Leap;
 var five = require('johnny-five');
+
+// Board and servos for Johnny-Five
 var board, servoBase, servoShoulder, servoElbow, servoClaw;
+
+// Position variables for the Leap
 var handPosition;
 var fingerDistance;
 var angles;
+
+// Movement variables
 var moveBase, moveShoulder, moveElbow, moveClaw;
 var frames = [];
+
+/*
+ * Settings
+ */
 var normalize = 3;
 var minimumClawDistance = 15;
+var boardOptions = { port: '/dev/cu.usbmodemfa131' };
 
-// Restricted physical movement values.  
+// Restricted input values (in Leap space). 
 // You can change these depending on how you build your robot arm.
-var MAX_Y = 415;
+var MAX_Y = 300;
 var MIN_Y = 120;
 var MAX_Z = 200;
 
@@ -43,6 +56,7 @@ controller.on('frame', function(frame) {
     if(handPosition[1] < 120) handPosition[1] = 120;
     if(handPosition[1] > 415) handPosition[1] = 415;
     if(handPosition[2] > 200) handPosition[2] = 200;
+    console.log(handPosition[1]);
 
     // Calculate all of the movement angles
     angles = calculateInverseKinematics(0,-10+handPosition[1]/normalize,handPosition[2]/normalize);
@@ -57,8 +71,6 @@ controller.on('frame', function(frame) {
     f2 = frame.pointables[1];
     fingerDistance = distance(f1.tipPosition[0],f1.tipPosition[1],f1.tipPosition[2],f2.tipPosition[0],f2.tipPosition[1],f2.tipPosition[2]);
     moveClaw = (fingerDistance/1.2) - minimumClawDistance;
-    //frame.pointables[0].tipPosition[0] - frame.pointables[1].tipPosition[0];
-    //console.log("fingerDistance: " + fingerDistance);
   }
   frames.push(frame);
 });
@@ -75,7 +87,7 @@ controller.connect();
 
 
 // Johnny-Five controller
-board = new five.Board();
+board = new five.Board(boardOptions);
 board.on('ready', function() {
   servoBase = new five.Servo(3);
   servoShoulder = new five.Servo(9);
@@ -124,8 +136,8 @@ function calculateBaseAngle(x) {
 
 function calculateInverseKinematics(x,y,z) {
   // Adjust the input values
-  y += 60;
-  z = -z;
+  y = y*1.5 + 40;
+  z = -z*1.5;
   
   // Normalize the values to mesh with your desired input range
   var l1 = 40*normalize;
