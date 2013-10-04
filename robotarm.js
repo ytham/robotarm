@@ -6,7 +6,7 @@
 /*
  * Variables
  */
-var Leap = require('leapjs').Leap;
+var Leap = require('leapjs');
 var five = require('johnny-five');
 
 // Board and servos for Johnny-Five
@@ -87,7 +87,7 @@ controller.connect();
 
 
 // Johnny-Five controller
-board = new five.Board(boardOptions);
+board = new five.Board();
 board.on('ready', function() {
   servoBase = new five.Servo(3);
   servoShoulder = new five.Servo(9);
