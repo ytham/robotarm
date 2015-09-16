@@ -14,11 +14,12 @@ var board, servoBase, servoShoulder, servoElbow, servoClaw;
 
 // Position variables for the Leap
 var handPosition;
+var handHistory = [];
 var fingerDistance;
-var angles;
+var armAngles;
 
 // Movement variables
-var moveBase, moveShoulder, moveElbow, moveClaw;
+var baseAngle, shoulderAngle, elbowAngle, clawAngle;
 var frames = [];
 
 /*
@@ -28,12 +29,18 @@ var normalize = 3;
 var minimumClawDistance = 15;
 var boardOptions = { port: '/dev/cu.usbmodemfa131' };
 
-// Restricted input values (in Leap space). 
+// Arm length in millimeters
+var LENGTH1 = 400;
+var LENGTH2 = 400;
+
+// Restricted input values (in Leap space).
 // You can change these depending on how you build your robot arm.
-var MAX_Y = 300;
+var MAX_Y = 415;
 var MIN_Y = 120;
 var MAX_Z = 200;
 
+// How many past frames to cache for smoothing; slows down response time with a higher number
+var SMOOTHING_FRAMES = 1;
 
 /*
  * Need to set up 4 servos: shoulder, elbow, claw, and base
@@ -51,18 +58,22 @@ controller.on('frame', function(frame) {
   if(frame.hands.length > 0) {
     handPosition = frame.hands[0].palmPosition;
 
+    var smoothedInput = smoothInput(handPosition);
+    smoothingQueue(handPosition);
+
     // Restrict certain inputs to prevent physical damage
-    // These values can be changed depending on 
-    if(handPosition[1] < 120) handPosition[1] = 120;
-    if(handPosition[1] > 415) handPosition[1] = 415;
-    if(handPosition[2] > 200) handPosition[2] = 200;
-    console.log(handPosition[1]);
+    // These values can be changed depending on
+    if(smoothedInput.y < MIN_Y) smoothedInput.y = MIN_Y;
+    if(smoothedInput.y > MAX_Y) smoothedInput.y = MAX_Y;
+    if(smoothedInput.z > MAX_Z) smoothedInput.z = MAX_Z;
+    console.log(smoothedInput);
 
     // Calculate all of the movement angles
-    angles = calculateInverseKinematics(0,-10+handPosition[1]/normalize,handPosition[2]/normalize);
-    moveBase = 180-calculateBaseAngle(handPosition[0]/1.5);
-    moveShoulder = toDegrees(angles.theta1);
-    moveElbow = 45+toDegrees(angles.theta2);
+    //angles = calculateInverseKinematics(0,-10+handPosition[1]/normalize,handPosition[2]/normalize);
+    armAngles = calculateInverseKinematics(smoothInput.y, smoothInput.z);
+    baseAngle = calculateBaseAngle(smoothInput.x, smoothInput.z);
+    shoulderAngle = armAngles.theta1;
+    elbowAngle = armAngles.theta2;
   }
 
   // Finger distance (of two fingers only) controls the end effector
@@ -70,7 +81,7 @@ controller.on('frame', function(frame) {
     f1 = frame.pointables[0];
     f2 = frame.pointables[1];
     fingerDistance = distance(f1.tipPosition[0],f1.tipPosition[1],f1.tipPosition[2],f2.tipPosition[0],f2.tipPosition[1],f2.tipPosition[2]);
-    moveClaw = (fingerDistance/1.2) - minimumClawDistance;
+    clawAngle = (fingerDistance/1.2) - minimumClawDistance;
   }
   frames.push(frame);
 });
@@ -78,7 +89,7 @@ controller.on('frame', function(frame) {
 // Leap Motion connected
 controller.on('connect', function(frame) {
   console.log("Leap Connected.");
-  setTimeout(function() { 
+  setTimeout(function() {
     var time = frames.length/2;
   }, 200);
 });
@@ -91,7 +102,7 @@ board = new five.Board();
 board.on('ready', function() {
   servoBase = new five.Servo(3);
   servoShoulder = new five.Servo(9);
-  servoElbow = new five.Servo(10); 
+  servoElbow = new five.Servo(10);
   servoClaw = new five.Servo(6);
 
   // Initial positions of the robot arm
@@ -102,28 +113,58 @@ board.on('ready', function() {
 
   // Move each component
   this.loop(20, function() {
-    if(!isNaN(moveShoulder) && !isNaN(moveElbow)) {
-      servoShoulder.move(moveShoulder);
-      servoElbow.move(moveElbow);
+    if(!isNaN(shoulderAngle) && !isNaN(elbowAngle)) {
+      servoShoulder.move(shoulderAngle);
+      servoElbow.move(elbowAngle);
     } else {
       console.log("Shoulder/Elbow NaN value detected.");
     }
-    if(moveBase >= 0 && moveBase <= 180) {
-      servoBase.move(moveBase);
+    if(baseAngle >= 0 && baseAngle <= 180) {
+      servoBase.move(baseAngle);
     }
-    if(moveClaw >= 0 && moveClaw <= 100) {
-      servoClaw.move(moveClaw);
+    if(clawAngle >= 0 && clawAngle <= 100) {
+      servoClaw.move(clawAngle);
     }
-    console.log("Base: " + Math.floor(moveBase) + "\tShoulder: " + Math.floor(moveShoulder) + "\tElbow: " + Math.floor(moveElbow) + "\tClaw: " + Math.floor(moveClaw));
+    console.log("Base: " + Math.floor(baseAngle) + "\tShoulder: " + Math.floor(shoulderAngle) + "\tElbow: " + Math.floor(elbowAngle) + "\tClaw: " + Math.floor(clawAngle));
   });
 });
+
+
+/*
+ * Smoothing
+ */
+function smoothInput(current) {
+  if (typeof last === 'undefined') {
+    return current;
+  }
+
+  var x = 0, y = 0, z = 0;
+  var periods = handHistory.length;
+
+  for (var i = 0; i < periods, i++) {
+    x += current[0] + handHistory[i][0];
+    y += current[1] + handHistory[i][1];
+    z += current[2] + handHistory[i][2];
+  }
+
+  periods += 1;
+  return {x: x/periods, y: y/periods, z: z/periods};
+}
+
+function smoothingQueue(current) {
+  handHistory.unshift(current);
+  if (handHistory.length > SMOOTHING_FRAMES) {
+    handHistory.pop();
+  }
+}
 
 
 /*
  * Angle Calculation Functions
  */
 
-function calculateBaseAngle(x) {
+function calculateBaseAngle(x,z) {
+  /*
   // Massage the input values a bit; salt to taste.
   var n = 100*normalize;
   x = 1.5+2*x/n;
@@ -132,13 +173,18 @@ function calculateBaseAngle(x) {
   // nonlinear due to the circular nature of the base.
   var angle = 90+Math.cos(x)*90;
   return angle;
+  */
+
+  var angle = Math.tan(x/z);
+  return angle;
 }
 
-function calculateInverseKinematics(x,y,z) {
+function calculateInverseKinematics(y,z) {
+  /*
   // Adjust the input values
   y = y*1.5 + 40;
   z = -z*1.5;
-  
+
   // Normalize the values to mesh with your desired input range
   var l1 = 40*normalize;
   var l2 = 40*normalize;
@@ -150,6 +196,21 @@ function calculateInverseKinematics(x,y,z) {
   return {
     theta1: t1,
     theta2: t2
+  }
+  */
+  // Get first angle
+  var hypotenuse = Math.sqrt(square(y)+square(z))
+  var a = Math.atan(z/y);
+  var b = Math.acos((square(LENGTH1)+square(hypotenuse)-square(LENGTH2))/(2*LENGTH1*hypotenuse));
+  var theta1 = toDegrees(a+b);
+
+  // Get second angle
+  var c = Math.acos((square(LENGTH2)+square(LENGTH1)-square(hypotenuse))/(2*LENGTH1*LENGTH2));
+  var theta2 = 180 - toDegrees(c);
+
+  return {
+    theta1: theta1,
+    theta2: theta2
   }
 }
 
