@@ -176,7 +176,7 @@ function calculateBaseAngle(x,z) {
   */
 
   var angle = Math.tan(x/z);
-  return angle;
+  return toDegrees(angle);
 }
 
 function calculateInverseKinematics(y,z) {
