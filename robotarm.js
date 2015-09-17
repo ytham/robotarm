@@ -131,10 +131,10 @@ board.on('ready', function() {
 
 
 /*
- * Smoothing
+ * Smoothing the input - takes the average value of SMOOTHING_FRAMES number of frames
  */
 function smoothInput(current) {
-  if (typeof last === 'undefined') {
+  if (handHistory.length === 0) {
     return current;
   }
 
@@ -147,7 +147,7 @@ function smoothInput(current) {
     z += current[2] + handHistory[i][2];
   }
 
-  periods += 1;
+  periods += 1; // To incldue the current frame
   return {x: x/periods, y: y/periods, z: z/periods};
 }
 
