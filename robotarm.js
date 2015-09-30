@@ -6,7 +6,7 @@
 /*
  * Variables
  */
-var Leap = require('leapjs');
+var Leap = require('leapjs').Leap;
 var five = require('johnny-five');
 
 // Board and servos for Johnny-Five
