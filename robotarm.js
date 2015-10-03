@@ -29,6 +29,12 @@ var normalize = 3;
 var minimumClawDistance = 15;
 var boardOptions = { port: '/dev/cu.usbmodemfa131' };
 
+// PWM Pins
+var PIN_BASE = 3;
+var PIN_SHOULDER = 9;
+var PIN_ELBOW = 10;
+var PIN_CLAW = 6;
+
 // Arm length in millimeters
 var LENGTH1 = 400;
 var LENGTH2 = 400;
@@ -96,14 +102,13 @@ controller.on('connect', function(frame) {
 
 controller.connect();
 
-
 // Johnny-Five controller
 board = new five.Board();
 board.on('ready', function() {
-  servoBase = new five.Servo(3);
-  servoShoulder = new five.Servo(9);
-  servoElbow = new five.Servo(10);
-  servoClaw = new five.Servo(6);
+  servoBase = new five.Servo(PIN_BASE);
+  servoShoulder = new five.Servo(PIN_SHOULDER);
+  servoElbow = new five.Servo(PIN_ELBOW);
+  servoClaw = new five.Servo(PIN_CLAW);
 
   // Initial positions of the robot arm
   servoBase.center();
