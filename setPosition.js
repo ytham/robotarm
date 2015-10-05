@@ -17,12 +17,12 @@ board.on('ready', function () {
   servoBase = new five.Servo(PIN_BASE);
   servoShoulder = new five.Servo(PIN_SHOULDER);
   servoElbow = new five.Servo(PIN_ELBOW);
-  servoClaw = new five.Servo(PIN_CLAW);
+  // servoClaw = new five.Servo(PIN_CLAW);
 
   console.log("Moving all servos to %s", POSITION);
 
-  servoBase.move(POSITION);
-  servoShoulder.move(POSITION);
-  servoElbow.move(POSITION);
-  servoClaw.move(POSITION);
+  servoBase.to(POSITION);
+  servoShoulder.to(POSITION);
+  servoElbow.to(POSITION);
+  // servoClaw.to(POSITION);
 });

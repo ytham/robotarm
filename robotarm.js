@@ -1,12 +1,13 @@
 /*
  * Leap Motion robot arm manipulator
  * Written by Yu Jiang Tham, 2013
+ * And re-written in 2015!
  */
 
 /*
  * Variables
  */
-var Leap = require('leapjs').Leap;
+var Leap = require('leapjs');
 var five = require('johnny-five');
 
 // Board and servos for Johnny-Five
@@ -36,17 +37,20 @@ var PIN_ELBOW = 10;
 var PIN_CLAW = 6;
 
 // Arm length in millimeters
-var LENGTH1 = 400;
-var LENGTH2 = 400;
+var LENGTH1 = 160;
+var LENGTH2 = 160;
+
+// Leap input zero point for calculating inverse kinematics
 
 // Restricted input values (in Leap space).
 // You can change these depending on how you build your robot arm.
 var MAX_Y = 415;
-var MIN_Y = 120;
-var MAX_Z = 200;
+var MIN_Y = 0;
+var MIN_Z = 0;
+var MAX_Z = 800;
 
 // How many past frames to cache for smoothing; slows down response time with a higher number
-var SMOOTHING_FRAMES = 1;
+var SMOOTHING_FRAMES = 10;
 
 /*
  * Need to set up 4 servos: shoulder, elbow, claw, and base
@@ -64,20 +68,25 @@ controller.on('frame', function(frame) {
   if(frame.hands.length > 0) {
     handPosition = frame.hands[0].palmPosition;
 
+    // Offset z to always keep the value positive
+    frame.hands[0].palmPosition[1] -= 150;
+    frame.hands[0].palmPosition[2] = 200 + (-1*frame.hands[0].palmPosition[2]);
+
     var smoothedInput = smoothInput(handPosition);
     smoothingQueue(handPosition);
 
     // Restrict certain inputs to prevent physical damage
-    // These values can be changed depending on
+    // These values should be changed depending on your arm design
     if(smoothedInput.y < MIN_Y) smoothedInput.y = MIN_Y;
     if(smoothedInput.y > MAX_Y) smoothedInput.y = MAX_Y;
+    if(smoothedInput.z < MIN_Z) smoothedInput.z = MIN_Z;
     if(smoothedInput.z > MAX_Z) smoothedInput.z = MAX_Z;
-    console.log(smoothedInput);
+    // console.log(smoothedInput);
 
     // Calculate all of the movement angles
     //angles = calculateInverseKinematics(0,-10+handPosition[1]/normalize,handPosition[2]/normalize);
-    armAngles = calculateInverseKinematics(smoothInput.y, smoothInput.z);
-    baseAngle = calculateBaseAngle(smoothInput.x, smoothInput.z);
+    armAngles = calculateInverseKinematics(smoothedInput.y, smoothedInput.z);
+    baseAngle = calculateBaseAngle(smoothedInput.x, smoothedInput.z);
     shoulderAngle = armAngles.theta1;
     elbowAngle = armAngles.theta2;
   }
@@ -87,7 +96,7 @@ controller.on('frame', function(frame) {
     f1 = frame.pointables[0];
     f2 = frame.pointables[1];
     fingerDistance = distance(f1.tipPosition[0],f1.tipPosition[1],f1.tipPosition[2],f2.tipPosition[0],f2.tipPosition[1],f2.tipPosition[2]);
-    clawAngle = (fingerDistance/1.2) - minimumClawDistance;
+    clawAngle = 120-fingerDistance;
   }
   frames.push(frame);
 });
@@ -111,24 +120,24 @@ board.on('ready', function() {
   servoClaw = new five.Servo(PIN_CLAW);
 
   // Initial positions of the robot arm
-  servoBase.center();
-  servoShoulder.center();
-  servoElbow.move(45);
-  servoClaw.move(100);
+  servoBase.to(90);
+  servoShoulder.to(90);
+  servoElbow.to(45);
+  servoClaw.to(40);
 
   // Move each component
-  this.loop(20, function() {
+  this.loop(30, function() {
     if(!isNaN(shoulderAngle) && !isNaN(elbowAngle)) {
-      servoShoulder.move(shoulderAngle);
-      servoElbow.move(elbowAngle);
+      servoShoulder.to(shoulderAngle);
+      servoElbow.to(elbowAngle);
     } else {
-      console.log("Shoulder/Elbow NaN value detected.");
+      //console.log("Shoulder/Elbow NaN value detected.");
     }
     if(baseAngle >= 0 && baseAngle <= 180) {
-      servoBase.move(baseAngle);
+      servoBase.to(baseAngle);
     }
-    if(clawAngle >= 0 && clawAngle <= 100) {
-      servoClaw.move(clawAngle);
+    if(clawAngle >= 20 && clawAngle <= 70) {
+      servoClaw.to(clawAngle);
     }
     console.log("Base: " + Math.floor(baseAngle) + "\tShoulder: " + Math.floor(shoulderAngle) + "\tElbow: " + Math.floor(elbowAngle) + "\tClaw: " + Math.floor(clawAngle));
   });
@@ -146,7 +155,7 @@ function smoothInput(current) {
   var x = 0, y = 0, z = 0;
   var periods = handHistory.length;
 
-  for (var i = 0; i < periods, i++) {
+  for (var i = 0; i < periods; i++) {
     x += current[0] + handHistory[i][0];
     y += current[1] + handHistory[i][1];
     z += current[2] + handHistory[i][2];
@@ -181,7 +190,7 @@ function calculateBaseAngle(x,z) {
   */
 
   var angle = Math.tan(x/z);
-  return toDegrees(angle);
+  return 90 - toDegrees(angle);
 }
 
 function calculateInverseKinematics(y,z) {
@@ -204,15 +213,18 @@ function calculateInverseKinematics(y,z) {
   }
   */
   // Get first angle
-  var hypotenuse = Math.sqrt(square(y)+square(z))
-  var a = Math.atan(z/y);
+  // var h1 = Math.sqrt(square(LENGTH1) + square(LENGTH2));
+  // var h2 = Math.sqrt(square(y)+square(z));
+  // console.log("%s == %s", y, z);
+  var hypotenuse = Math.sqrt(square(y)+square(z));
+  var a = Math.atan(y/z);
   var b = Math.acos((square(LENGTH1)+square(hypotenuse)-square(LENGTH2))/(2*LENGTH1*hypotenuse));
   var theta1 = toDegrees(a+b);
 
   // Get second angle
   var c = Math.acos((square(LENGTH2)+square(LENGTH1)-square(hypotenuse))/(2*LENGTH1*LENGTH2));
   var theta2 = 180 - toDegrees(c);
-
+  // console.log("t1: %s\tt2: %s", theta1, theta2);
   return {
     theta1: theta1,
     theta2: theta2
