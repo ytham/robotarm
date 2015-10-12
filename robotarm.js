@@ -178,44 +178,11 @@ function smoothingQueue(current) {
  */
 
 function calculateBaseAngle(x,z) {
-  /*
-  // Massage the input values a bit; salt to taste.
-  var n = 100*normalize;
-  x = 1.5+2*x/n;
-
-  // 90 Degrees is the center of the base servo, and we want the movement to be
-  // nonlinear due to the circular nature of the base.
-  var angle = 90+Math.cos(x)*90;
-  return angle;
-  */
-
   var angle = Math.tan(x/z);
   return 90 - toDegrees(angle);
 }
 
 function calculateInverseKinematics(y,z) {
-  /*
-  // Adjust the input values
-  y = y*1.5 + 40;
-  z = -z*1.5;
-
-  // Normalize the values to mesh with your desired input range
-  var l1 = 40*normalize;
-  var l2 = 40*normalize;
-
-  // Inverse kinematics equations
-  var t1 = Math.acos((square(z)+square(y)-square(l1)-square(l2))/(2*l1*l2));
-  var t2 = Math.asin(((l1+l2*Math.cos(t1))*y-l2*Math.sin(t1)*z)/(square(l1)+square(l2)+2*l1*l2*Math.cos(t1)));
-  //console.log("[DEBUG] THETA1: " + toDegrees(t1) + "\tTHETA2: " + toDegrees(t2));
-  return {
-    theta1: t1,
-    theta2: t2
-  }
-  */
-  // Get first angle
-  // var h1 = Math.sqrt(square(LENGTH1) + square(LENGTH2));
-  // var h2 = Math.sqrt(square(y)+square(z));
-  // console.log("%s == %s", y, z);
   var hypotenuse = Math.sqrt(square(y)+square(z));
   var a = Math.atan(y/z);
   var b = Math.acos((square(LENGTH1)+square(hypotenuse)-square(LENGTH2))/(2*LENGTH1*hypotenuse));
@@ -247,20 +214,3 @@ function square(x) {
 function toDegrees(r) {
   return r*57.2957795;
 }
-
-
-// This function has been deprecated.
-/*
-function calculateInverseKinematics_DEP(x,y,z) {
-  var length = 100;
-  var c2 = (square(z)+square(y)-square(length)-square(length))/(2*length*length);
-  var s2 = Math.sqrt(1-square(c2));
-  console.log("\t%c" + "y: " + y + " | z: " + z + " | c2: " + c2);
-  var shoulderAngle = Math.acos(c2); // psi
-  var elbowAngle = Math.asin((y*(length+length*c2)-z*length*s2)/(square(z)+square(y))); //theta
-  //console.log("PSI: " + shoulderAngle*57.295 + "\tTHETA: " + elbowAngle*57.295);
-  return {
-    shoulderAngle: shoulderAngle,
-    elbowAngle: elbowAngle
-  }
-}*/
